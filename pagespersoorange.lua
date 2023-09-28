@@ -96,6 +96,10 @@ set_item = function(url)
     item_type = "url"
     item_value = candidate
     item_name = item_type .. ":" .. item_value
+    abortgrab = false
+    tries = 0
+    retry_url = false
+    is_initial_url = true
     print("Archiving item " .. item_name)
   end
 end

@@ -22,6 +22,7 @@ local killgrab = false
 local logged_response = false
 
 local discovered_items = {}
+local discovered_outlinks = {}
 local bad_items = {}
 local ids = {}
 
@@ -47,7 +48,6 @@ end
 
 abort_item = function(item)
   abortgrab = true
-  killgrab = true
   if not item then
     item = item_name
   end
@@ -115,26 +115,29 @@ end
 queue_all_versions = function(url)
   local sites = {
     {
-      "perso.wanadoo",
-      "perso.orange",
-      "pagesperso-orange",
-      "perso.wanadoo"
+      ["perso.wanadoo"]="skip",
+      ["perso.orange"]="skip",
+      ["pagesperso-orange"]="queue"
     },
     {
-      "monsite.wanadoo",
-      "monsite.orange",
-      "monsite-orange",
+      ["monsite.wanadoo"]="skip",
+      ["monsite.orange"]="skip",
+      ["monsite-orange"]="queue"
     },
     {
-      "pro.wanadoo",
-      "pro.orange",
-      "pros.orange",
-      "pagespro-orange",
-      "mairie.pagespro-orange",
-      "assoc.pagespro-orange",
-      "ecole.pagespro-orange"
+      ["pro.wanadoo"]="skip",
+      ["pro.orange"]="skip",
+      ["pros.orange"]="skip",
+      ["pagespro-orange"]="queue",
+      ["mairie.pagespro-orange"]="queue",
+      ["assoc.pagespro-orange"]="queue",
+      ["ecole.pagespro-orange"]="queue"
     }
   }
+
+  if string.match(url, "^https?://[^/]*woopic%.com/") then
+    return allowed(url, "version")
+  end
 
   local function queue_all(sub, site, rest)
     if not sub
@@ -150,32 +153,42 @@ queue_all_versions = function(url)
       ) then
       return nil
     end
+    local any_match = false
     for _, orange_sites in pairs(sites) do
       local found = false
-      for _, orange_site in pairs(orange_sites) do
+      for orange_site, _ in pairs(orange_sites) do
         if orange_site == sub then
           found = true
+          any_match = true
           break
         end
       end
       if found then
-        for _, orange_site in pairs(orange_sites) do
-          for _, protocol in pairs({"http", "https"}) do
-            allowed(protocol .. "://" .. site .. "." .. orange_site .. ".fr/" .. rest, "version")
-            allowed(protocol .. "://" .. orange_site .. ".fr/" .. site .. "/" .. rest, "version")
-            allowed(protocol .. "://" .. site .. "." .. orange_site .. ".fr/", "version")
-            allowed(protocol .. "://" .. orange_site .. ".fr/" .. site .. "/", "version")
+        for orange_site, directive in pairs(orange_sites) do
+          if directive == "queue" then
+            for _, protocol in pairs({"http", "https"}) do
+              allowed(protocol .. "://" .. site .. "." .. orange_site .. ".fr/" .. rest, "version")
+              allowed(protocol .. "://" .. orange_site .. ".fr/" .. site .. "/" .. rest, "version")
+              allowed(protocol .. "://" .. site .. "." .. orange_site .. ".fr/", "version")
+              allowed(protocol .. "://" .. orange_site .. ".fr/" .. site .. "/", "version")
+            end
           end
         end
         break
       end
     end
+    return any_match
   end
 
   local sub, site, rest = string.match(url, "^https?://([^/]+)%.fr/([0-9a-zA-Z%-_%.]+)/?(.-)$")
-  queue_all(sub, site, rest)
+  local match1 = queue_all(sub, site, rest)
   site, sub, rest = string.match(url, "^https?://([0-9a-zA-Z%-_%.]+)%.([^/]+)%.fr/(.-)$")
-  queue_all(sub, site, rest)
+  local match2 = queue_all(sub, site, rest)
+  if not match1 and not match2 then
+    discovered_outlinks[url] = true
+  else
+    allowed(url, "version")
+  end
 end
 
 wget.callbacks.download_child_p = function(urlpos, parent, depth, start_url_parsed, iri, verdict, reason)
@@ -220,6 +233,8 @@ end
 
 wget.callbacks.httploop_result = function(url, err, http_stat)
   status_code = http_stat["statcode"]
+
+  queue_all_versions(url["url"])
   
   if not logged_response then
     url_count = url_count + 1
@@ -237,15 +252,19 @@ wget.callbacks.httploop_result = function(url, err, http_stat)
     error("No item name found.")
   end
 
-  os.execute("sleep " .. tostring(2*concurrency))
+  local factor = 2
+  if status_code ~= 200 then
+    factor = 8
+  end
+  os.execute("sleep " .. tostring(factor*concurrency))
 
-  if status_code >= 300 and status_code <= 399 then
+  --[[if status_code >= 300 and status_code <= 399 then
     local newloc = urlparse.absolute(url["url"], http_stat["newloc"])
     if processed(newloc) or not allowed(newloc, url["url"]) then
       tries = 0
       return wget.actions.EXIT
     end
-  end
+  end]]
 
   if abortgrab then
     abort_item()
@@ -256,7 +275,7 @@ wget.callbacks.httploop_result = function(url, err, http_stat)
     io.stdout:write("Server returned bad response. ")
     io.stdout:flush()
     tries = tries + 1
-    local maxtries = 1
+    local maxtries = tries - 1
     if tries > maxtries then
       io.stdout:write(" Skipping.\n")
       io.stdout:flush()
@@ -313,6 +332,7 @@ wget.callbacks.finish = function(start_time, end_time, wall_time, numurls, total
   end
   file:close()
   for key, data in pairs({
+    ["urls-eew3ydz89258xhs1"] = discovered_outlinks,
     ["pagespersoorange-90zcnxoidh7iweq3"] = discovered_items
   }) do
     print('queuing for', string.match(key, "^(.+)%-"))

@@ -116,18 +116,18 @@ queue_all_versions = function(url)
   local sites = {
     {
       ["perso.wanadoo"]="skip",
-      ["perso.orange"]="skip",
+      ["perso.orange"]="queue",
       ["pagesperso-orange"]="queue"
     },
     {
-      ["monsite.wanadoo"]="skip",
-      ["monsite.orange"]="skip",
+      ["monsite.wanadoo"]="queue",
+      ["monsite.orange"]="queue",
       ["monsite-orange"]="queue"
     },
     {
       ["pro.wanadoo"]="skip",
-      ["pro.orange"]="skip",
-      ["pros.orange"]="skip",
+      ["pro.orange"]="queue",
+      ["pros.orange"]="queue",
       ["pagespro-orange"]="queue",
       ["mairie.pagespro-orange"]="queue",
       ["assoc.pagespro-orange"]="queue",

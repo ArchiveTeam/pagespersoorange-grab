@@ -43,7 +43,12 @@ end
 
 local urls = {}
 for url in string.gmatch(item_names, "([^\n]+)") do
-  urls[normalize_url(string.match(url, "^url:(.+)$"))] = true
+  local normalized_url = normalize_url(string.match(url, "^url:(.+)$"))
+  local _, slash_count = string.gsub(normalized_url, "/", "")
+  if slash_count == 2 then
+    normalized_url = normalized_url .. "/"
+  end
+  urls[normalized_url] = true
 end
 
 abort_item = function(item)
@@ -104,19 +109,33 @@ set_item = function(url)
   end
 end
 
+percent_encode_url = function(url)
+  temp = ""
+  for c in string.gmatch(url, "(.)") do
+    local b = string.byte(c)
+    if b < 32 or b > 126 then
+      c = string.format("%%%02X", b)
+    end
+    temp = temp .. c
+  end
+  return temp
+end
+
 allowed = function(url, parenturl)
   if item_name == url then
     return true
   end
 
   if parenturl and parenturl == "version" then
-    discover_item(discovered_items, "url:" .. url)
+    discover_item(discovered_items, "url:" .. percent_encode_url(url))
   end
 
   return false
 end
 
 queue_all_versions = function(url)
+  print("Queuing all for", url)
+
   local sites = {
     {
       ["perso.wanadoo"]="skip",
@@ -206,7 +225,7 @@ end
 wget.callbacks.get_urls = function(file, url, is_css, iri)  
   downloaded[url] = true
 
-  queue_all_versions(url)
+  --queue_all_versions(url)
 
   return {}
 end
@@ -222,7 +241,9 @@ wget.callbacks.write_to_warc = function(url, http_stat)
     error("No item name found.")
   end
   is_initial_url = false
-  if http_stat["statcode"] ~= 200 then
+  if http_stat["statcode"] ~= 200
+    and http_stat["statcode"] ~= 301
+    and http_stat["statcode"] ~= 302 then
     retry_url = true
     return false
   end
@@ -238,7 +259,9 @@ end
 wget.callbacks.httploop_result = function(url, err, http_stat)
   status_code = http_stat["statcode"]
 
-  queue_all_versions(url["url"])
+  if status_code == 200 then
+    queue_all_versions(url["url"])
+  end
   
   if not logged_response then
     url_count = url_count + 1
@@ -258,17 +281,38 @@ wget.callbacks.httploop_result = function(url, err, http_stat)
 
   local factor = 2
   if status_code ~= 200 then
-    factor = 8
+    factor = 6
   end
   os.execute("sleep " .. tostring(factor*concurrency))
 
-  --[[if status_code >= 300 and status_code <= 399 then
+  if status_code == 301 or status_code == 302 then
     local newloc = urlparse.absolute(url["url"], http_stat["newloc"])
-    if processed(newloc) or not allowed(newloc, url["url"]) then
-      tries = 0
+    print("Found redirect to " .. newloc .. ".")
+    allowed(newloc, "version")
+    if string.match(url["url"], "^https?://(.+)$") == string.match(newloc, "^https?://(.+)$") then
       return wget.actions.EXIT
     end
-  end]]
+    local url_sub1, url_site1, url_rest1 = string.match(url["url"], "^https?://([^/]+)%.fr/([0-9a-zA-Z%-_%.]+)/?(.-)$")
+    local newloc_site1, newloc_sub1, newloc_rest1 = string.match(newloc, "^https?://([0-9a-zA-Z%-_%.]+)%.([^/]+)%.fr/(.-)$")
+    if url_sub1 == newloc_sub1
+      and url_site1 == newloc_site1
+      and url_rest1 == newloc_rest1 then
+      return wget.actions.EXIT
+    end
+    local url_site2, url_sub2, url_rest2 = string.match(url["url"], "^https?://([0-9a-zA-Z%-_%.]+)%.([^/]+)%.fr/(.-)$")
+    local newloc_sub2, newloc_site2, newloc_rest2 = string.match(newloc, "^https?://([^/]+)%.fr/([0-9a-zA-Z%-_%.]+)/?(.-)$")
+    if url_sub2 == newloc_sub2
+      and url_site2 == newloc_site2
+      and url_rest2 == newloc_rest2 then
+      return wget.actions.EXIT
+    end
+    --[[if not string.match(newloc, "/r/Oerreur_404$")
+      and not string.match(newloc, "/error404%.html$") then]]
+      queue_all_versions(newloc)
+      queue_all_versions(url["url"])
+    --end
+    return wget.actions.EXIT
+  end
 
   if abortgrab then
     abort_item()

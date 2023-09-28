@@ -28,6 +28,11 @@ from tornado import httpclient
 import requests
 import zstandard
 
+if sys.version_info[0] < 3:
+    from urllib import unquote
+else:
+    from urllib.parse import unquote
+
 if StrictVersion(seesaw.__version__) < StrictVersion('0.8.5'):
     raise Exception('This pipeline needs seesaw version 0.8.5 or higher.')
 
@@ -59,7 +64,7 @@ if not WGET_AT:
 #
 # Update this each time you make a non-cosmetic change.
 # It will be added to the WARC files and reported to the tracker.
-VERSION = '20230928.03'
+VERSION = '20230928.04'
 USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/116.0'
 TRACKER_ID = 'pagespersoorange'
 TRACKER_HOST = 'legacy-api.arpa.li'
@@ -144,6 +149,17 @@ class MoveFiles(SimpleTask):
         shutil.rmtree('%(item_dir)s' % item)
 
 
+def normalize_url(url):
+    while True:
+        temp = unquote(url).strip().lower()
+        if temp == url:
+            break
+        url = temp
+    if url.count('/') == 2:
+        url += '/'
+    return url
+
+
 class SetBadUrls(SimpleTask):
     def __init__(self):
         SimpleTask.__init__(self, 'SetBadUrls')
@@ -151,10 +167,11 @@ class SetBadUrls(SimpleTask):
     def process(self, item):
         item['item_name_original'] = item['item_name']
         items = item['item_name'].split('\0')
-        items_lower = [s.lower() for s in items]
-        with open('%(item_dir)s/%(warc_file_base)s_bad-items.txt' % item, 'r') as f:
-            for aborted_item in f:
-                aborted_item = aborted_item.strip().lower()
+        items_lower = [normalize_url(s) for s in items]
+        with open('%(item_dir)s/%(warc_file_base)s_bad-items.txt' % item, 'r', errors='ignore') as f:
+            for aborted_item in {
+                normalize_url(aborted_item) for aborted_item in f
+            }:
                 index = items_lower.index(aborted_item)
                 item.log_output('Item {} is aborted.'.format(aborted_item))
                 items.pop(index)

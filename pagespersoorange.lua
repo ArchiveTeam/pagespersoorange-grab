@@ -163,6 +163,17 @@ queue_all_versions = function(url)
   end
 
   local function queue_all(sub, site, rest)
+    if site then
+      while true do
+        if string.match(site, "%.mairie$")
+          or string.match(site, "%.assoc$")
+          or string.match(site, "%.ecole$") then
+          site = string.match(site, "^(.-)%.[a-z]+$")
+        else
+          break
+        end
+      end
+    end
     if not sub
       or not site
       or not rest
@@ -172,9 +183,6 @@ queue_all_versions = function(url)
           site == "mairie"
           or site == "assoc"
           or site == "ecole"
-          or string.match(site, "%.mairie$")
-          or string.match(site, "%.assoc$")
-          or string.match(site, "%.ecole$")
         )
       ) then
       return nil

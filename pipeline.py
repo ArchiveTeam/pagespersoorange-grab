@@ -64,7 +64,7 @@ if not WGET_AT:
 #
 # Update this each time you make a non-cosmetic change.
 # It will be added to the WARC files and reported to the tracker.
-VERSION = '20230929.01'
+VERSION = '20230929.02'
 USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/116.0'
 TRACKER_ID = 'pagespersoorange'
 TRACKER_HOST = 'legacy-api.arpa.li'
@@ -302,6 +302,18 @@ class WgetArgs(object):
             if concurrency is None:
                 concurrency = 2
         item['concurrency'] = str(concurrency)
+
+        #filtered_items = []
+        #for item_name in item['item_name'].split('\0'):
+        #    item_search = '/'.join(item_name.split('/')[:4])
+        #    for combination in itertools.product(['mairie', 'assoc', 'ecole'], repeat=2):
+        #        if '.'.join(combination) in item_search:
+        #            break
+        #    else:
+        #        filtered_items.append(item_name)
+        #        continue
+        #    print('Filtering out item', item_name)
+        #item['item_name'] = '\0'.join(filtered_items)
 
         for item_name in item['item_name'].split('\0'):
             wget_args.extend(['--warc-header', 'x-wget-at-project-item-name: '+item_name])

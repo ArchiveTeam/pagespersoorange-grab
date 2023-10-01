@@ -172,6 +172,9 @@ queue_all_versions = function(url)
           site == "mairie"
           or site == "assoc"
           or site == "ecole"
+          or string.match(site, "%.mairie$")
+          or string.match(site, "%.assoc$")
+          or string.match(site, "%.ecole$")
         )
       ) then
       return nil

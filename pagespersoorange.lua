@@ -290,15 +290,25 @@ wget.callbacks.httploop_result = function(url, err, http_stat)
     error("No item name found.")
   end
 
-  local factor = 2
-  if status_code ~= 200 then
+  local newloc = nil
+  local to_404 = false
+
+  if status_code == 301 or status_code == 302 then
+    newloc = urlparse.absolute(url["url"], http_stat["newloc"])
+    print("Found redirect to " .. newloc .. ".")
+    if string.match(newloc, "/r/Oerreur_404$")
+      or string.match(newloc, "/error404%.html$") then
+      to_404 = true
+    end
+  end
+
+  local factor = 1
+  if to_404 then
     factor = 6
   end
   os.execute("sleep " .. tostring(factor*concurrency))
 
-  if status_code == 301 or status_code == 302 then
-    local newloc = urlparse.absolute(url["url"], http_stat["newloc"])
-    print("Found redirect to " .. newloc .. ".")
+  if newloc then
     allowed(newloc, "version")
     if string.match(url["url"], "^https?://(.+)$") == string.match(newloc, "^https?://(.+)$") then
       return wget.actions.EXIT
@@ -317,11 +327,8 @@ wget.callbacks.httploop_result = function(url, err, http_stat)
       and url_rest2 == newloc_rest2 then
       return wget.actions.EXIT
     end
-    --[[if not string.match(newloc, "/r/Oerreur_404$")
-      and not string.match(newloc, "/error404%.html$") then]]
-      queue_all_versions(newloc)
-      queue_all_versions(url["url"])
-    --end
+    queue_all_versions(newloc)
+    queue_all_versions(url["url"])
     return wget.actions.EXIT
   end
 

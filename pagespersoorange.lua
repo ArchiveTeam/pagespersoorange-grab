@@ -163,7 +163,7 @@ queue_all_versions = function(url)
   end
 
   local function queue_all(sub, site, rest)
-    if site then
+    if site and string.match(sub, "pagespro%-orange$") then
       while true do
         if string.match(site, "%.mairie$")
           or string.match(site, "%.assoc$")

@@ -64,7 +64,7 @@ if not WGET_AT:
 #
 # Update this each time you make a non-cosmetic change.
 # It will be added to the WARC files and reported to the tracker.
-VERSION = '20231002.01'
+VERSION = '20231003.01'
 USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/116.0'
 TRACKER_ID = 'pagespersoorange'
 TRACKER_HOST = 'legacy-api.arpa.li'
@@ -172,6 +172,8 @@ class SetBadUrls(SimpleTask):
             for aborted_item in {
                 normalize_url(aborted_item) for aborted_item in f
             }:
+                if aborted_item not in items_lower:
+                    aborted_item = aborted_item.split(':', 1)[1]
                 index = items_lower.index(aborted_item)
                 item.log_output('Item {} is aborted.'.format(aborted_item))
                 items.pop(index)
@@ -318,6 +320,8 @@ class WgetArgs(object):
         for item_name in item['item_name'].split('\0'):
             wget_args.extend(['--warc-header', 'x-wget-at-project-item-name: '+item_name])
             wget_args.append('item-name://'+item_name)
+            if not item_name.startswith('url:'):
+                item_name = 'url:' + item_name
             item_type, item_value = item_name.split(':', 1)
             if item_type == 'url':
                 wget_args.extend(['--warc-header', 'pagespersoorange-url: '+item_value])

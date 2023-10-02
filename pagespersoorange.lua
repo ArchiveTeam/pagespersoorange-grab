@@ -44,7 +44,7 @@ end
 
 local urls = {}
 for url in string.gmatch(item_names, "([^\n]+)") do
-  local normalized_url = normalize_url(string.match(url, "^url:(.+)$"))
+  local normalized_url = normalize_url(string.match(url, "^url:(.+)$") or url)
   local _, slash_count = string.gsub(normalized_url, "/", "")
   if slash_count == 2 then
     normalized_url = normalized_url .. "/"

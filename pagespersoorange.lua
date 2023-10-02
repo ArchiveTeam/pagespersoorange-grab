@@ -25,6 +25,7 @@ local discovered_items = {}
 local discovered_outlinks = {}
 local bad_items = {}
 local ids = {}
+local seen_url = {}
 
 local retry_url = false
 local is_initial_url = true
@@ -269,6 +270,16 @@ end
 
 wget.callbacks.httploop_result = function(url, err, http_stat)
   status_code = http_stat["statcode"]
+
+  if not seen_url[url["url"]] then
+    seen_url[url["url"]] = 0
+  end
+  seen_url[url["url"]] = seen_url[url["url"]] + 1
+  if seen_url[url["url"]] > 5 then
+    tries = 0
+    abort_item()
+    return wget.actions.EXIT
+  end
 
   if status_code == 200 then
     queue_all_versions(url["url"])
